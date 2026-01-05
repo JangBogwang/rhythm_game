@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cyber Ship Runner Final</title>
+    <link rel="stylesheet" href="src/css/style.css">
+</head>
+<body>
+
+<!-- Mobile Touch Controls -->
+<div id="touch-controls">
+    <div id="btn-left" class="touch-zone"></div>
+    <div id="btn-right" class="touch-zone"></div>
+</div>
+
+<!-- 로딩 화면 -->
+<div id="loading-screen">
+    <div class="loader-content">
+        <h1 class="glitch" data-text="NEON DRIFT">NEON DRIFT</h1>
+        <div class="loading-bar-container">
+            <div id="loading-bar"></div>
+        </div>
+        <div id="loading-status">SYSTEM INITIALIZING...</div>
+    </div>
+</div>
+
+<div id="score-board">SCORE: 0</div>
+
+<div id="ui-layer">
+    <div id="instruction">
+        <h1>NEON DRIFT</h1>
+        <p>MP3 파일을 <span class="highlight">드래그 & 드롭</span> 하여 엔진 시동.</p>
+        <p>또는</p>
+        <input type="file" id="file-input" accept="audio/*" style="display: none;">
+        <button id="upload-btn">SELECT MUSIC FILE</button>
+        <p style="margin-top: 30px; font-size: 14px; color:#aaa;">조작: ⬅️ 방향키 ➡️</p>
+    </div>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module" src="src/js/main.js"></script>
+</body>
+</html>
