@@ -63,6 +63,7 @@ h1 { margin: 0 0 20px 0; color: #f0f; text-shadow: 0 0 20px #f0f; }
 
 /* [NEW] 업로드 버튼 스타일 */
 #upload-btn {
+    display: inline-block; /* Label requires this to accept padding/margin */
     background: transparent;
     border: 2px solid #0ff;
     color: #0ff;

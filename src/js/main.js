@@ -256,12 +256,9 @@ window.addEventListener('drop', (e) => {
 
 // 파일 선택 버튼
 const fileInput = document.getElementById('file-input');
-const uploadBtn = document.getElementById('upload-btn');
+const touchControls = document.getElementById('touch-controls');
 
-if(uploadBtn && fileInput) {
-    uploadBtn.addEventListener('click', () => {
-        fileInput.click();
-    });
+if(fileInput) {
     fileInput.addEventListener('change', (e) => {
         if (player && obstacleModel && e.target.files[0]) {
             startGame(e.target.files[0]);
@@ -271,6 +268,8 @@ if(uploadBtn && fileInput) {
 
 function startGame(file) {
     instruction.parentElement.style.display = 'none';
+    if(touchControls) touchControls.style.display = 'flex';
+
     score = 0;
     scoreBoard.innerText = "SCORE: 0";
     isPlaying = true;
@@ -357,6 +356,75 @@ function updateVisuals() {
     });
 }
 
+// [NEW] 폭발 이펙트 시스템
+const explosions = [];
+const explosionGeo = new THREE.BufferGeometry();
+const explosionCount = 30;
+explosionGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Array(explosionCount * 3).fill(0), 3));
+explosionGeo.setAttribute('velocity', new THREE.Float32BufferAttribute(new Array(explosionCount * 3).fill(0), 3));
+
+function createExplosion(position) {
+    const geometry = explosionGeo.clone();
+    const velocities = [];
+    
+    for (let i = 0; i < explosionCount; i++) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI;
+        const speed = (Math.random() * 0.5) + 0.2;
+        
+        velocities.push(
+            speed * Math.sin(phi) * Math.cos(theta),
+            speed * Math.sin(phi) * Math.sin(theta),
+            speed * Math.cos(phi)
+        );
+    }
+    
+    geometry.setAttribute('velocity', new THREE.Float32BufferAttribute(velocities, 3));
+    
+    const material = new THREE.PointsMaterial({
+        color: 0x00ffff,
+        size: 0.8,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending
+    });
+
+    const points = new THREE.Points(geometry, material);
+    points.position.copy(position);
+    scene.add(points);
+    
+    explosions.push({
+        mesh: points,
+        age: 0
+    });
+}
+
+function updateExplosions() {
+    for (let i = explosions.length - 1; i >= 0; i--) {
+        const explosion = explosions[i];
+        explosion.age += 1;
+        
+        const positions = explosion.mesh.geometry.attributes.position.array;
+        const velocities = explosion.mesh.geometry.attributes.velocity.array;
+        
+        for (let j = 0; j < explosionCount; j++) {
+            positions[j * 3] += velocities[j * 3];
+            positions[j * 3 + 1] += velocities[j * 3 + 1];
+            positions[j * 3 + 2] += velocities[j * 3 + 2];
+        }
+        
+        explosion.mesh.geometry.attributes.position.needsUpdate = true;
+        explosion.mesh.material.opacity = 1.0 - (explosion.age / 40);
+        
+        if (explosion.age > 40) {
+            scene.remove(explosion.mesh);
+            explosion.mesh.geometry.dispose();
+            explosion.mesh.material.dispose();
+            explosions.splice(i, 1);
+        }
+    }
+}
+
 function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
@@ -375,6 +443,7 @@ function animate() {
     }
 
     updateVisuals();
+    updateExplosions(); // [NEW] 이펙트 업데이트
 
     // [음악 반응 로직]
     if (isPlaying && analyser) {
@@ -421,6 +490,15 @@ function animate() {
         obj.rotation.x -= 0.1 * delta; 
         obj.rotation.y += (obj.userData.rotSpeed.y * 0.1) * delta;
 
+        // [NEW] 플레이어를 통과했을 때 이펙트 발생
+        if (!obj.userData.passed && obj.position.z > 2.0) {
+            obj.userData.passed = true;
+            createExplosion(obj.position);
+            // 약간의 점수 효과음이나 시각적 피드백 추가 가능
+            bloomPass.strength = 2.0;
+            setTimeout(() => bloomPass.strength = 1.2, 50);
+        }
+
         if (obj.position.z > -2 && obj.position.z < 2) {
             if (Math.abs(obj.position.x - player.position.x) < 2.0) { 
                 gameOver();
@@ -442,7 +520,25 @@ function gameOver() {
     if(!isPlaying) return;
     isPlaying = false;
     instruction.parentElement.style.display = 'flex';
+    if(touchControls) touchControls.style.display = 'none';
+
     instruction.innerHTML = `<h1 style="color:red">IMPACT DETECTED</h1><p style="font-size:24px;">${score}</p><p>DROP MUSIC TO RETRY</p>`;
+    
+    // 게임 오버 시에도 파일 업로드 버튼 복구 (재시작 용이성)
+    instruction.innerHTML += `
+        <input type="file" id="file-input-retry" accept="audio/*" style="display: none;">
+        <label for="file-input-retry" id="upload-btn" style="display:inline-block; margin-top:20px;">TRY AGAIN</label>
+    `;
+    
+    setTimeout(() => {
+        const retryInput = document.getElementById('file-input-retry');
+        if(retryInput) {
+            retryInput.addEventListener('change', (e) => {
+                 if (e.target.files[0]) startGame(e.target.files[0]);
+            });
+        }
+    }, 100);
+
     if(source) source.stop();
 }
 

@@ -9,7 +9,7 @@
 <body>
 
 <!-- Mobile Touch Controls -->
-<div id="touch-controls">
+<div id="touch-controls" style="display: none;">
     <div id="btn-left" class="touch-zone"></div>
     <div id="btn-right" class="touch-zone"></div>
 </div>
@@ -33,7 +33,7 @@
         <p>MP3 파일을 <span class="highlight">드래그 & 드롭</span> 하여 엔진 시동.</p>
         <p>또는</p>
         <input type="file" id="file-input" accept="audio/*" style="display: none;">
-        <button id="upload-btn">SELECT MUSIC FILE</button>
+        <label for="file-input" id="upload-btn">SELECT MUSIC FILE</label>
         <p style="margin-top: 30px; font-size: 14px; color:#aaa;">조작: ⬅️ 방향키 ➡️</p>
     </div>
 </div>
