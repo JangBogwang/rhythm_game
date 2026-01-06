@@ -258,17 +258,38 @@ window.addEventListener('drop', (e) => {
 const fileInput = document.getElementById('file-input');
 const touchControls = document.getElementById('touch-controls');
 
-if(fileInput) {
-    fileInput.addEventListener('change', (e) => {
-        if (player && obstacleModel && e.target.files[0]) {
-            startGame(e.target.files[0]);
-        }
-    });
+function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // [CRITICAL] iOS/Mobile 정책 대응: 사용자 제스처(change 이벤트) 내에서 즉시 AudioContext 생성
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContextClass();
+    
+    // 모델이 아직 로드되지 않았다면 경고 (보통 로딩 화면 때문에 이럴 일은 드묾)
+    if (!player || !obstacleModel) {
+        alert("Resources not ready yet. Please wait.");
+        return;
+    }
+
+    // "DECODING..." 피드백 표시
+    const originalText = instruction.innerHTML;
+    instruction.innerHTML = `<h1>PROCESSING...</h1><div style="color:#0ff">DECODING AUDIO DATA</div>`;
+    
+    // 같은 파일 다시 선택 가능하도록 초기화
+    e.target.value = '';
+
+    startGame(file, ctx);
 }
 
-function startGame(file) {
-    instruction.parentElement.style.display = 'none';
-    if(touchControls) touchControls.style.display = 'flex';
+if(fileInput) {
+    fileInput.addEventListener('change', handleFileSelect);
+}
+
+function startGame(file, ctx) {
+    // startGame에서는 UI 숨김 처리를 비동기 완료 후로 미루거나, 
+    // 여기서 바로 숨기지 않고 setupAudio 완료 후 숨깁니다.
+    // 하지만 "Processing"을 보여주기 위해 유지합니다.
 
     score = 0;
     scoreBoard.innerText = "SCORE: 0";
@@ -279,26 +300,44 @@ function startGame(file) {
     spawnHistory = [];
     averageBass = 0;
     
-    const reader = new FileReader();
-    reader.readAsArrayBuffer(file);
-    reader.onload = (e) => setupAudio(e.target.result);
-}
-
-function setupAudio(buffer) {
-    if (source) source.stop();
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    // 기존 오디오 정리
+    if (source) {
+        try { source.stop(); } catch(e){}
+        source = null;
+    }
+    
+    // 오디오 컨텍스트 설정
+    audioContext = ctx;
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 512;
     dataArray = new Uint8Array(analyser.frequencyBinCount);
-    audioContext.decodeAudioData(buffer, (decodedData) => {
-        source = audioContext.createBufferSource();
-        source.buffer = decodedData;
-        source.connect(analyser);
-        analyser.connect(audioContext.destination);
-        source.start(0);
-        source.onended = gameOver;
-    });
+
+    const reader = new FileReader();
+    reader.readAsArrayBuffer(file);
+    reader.onload = (e) => {
+        audioContext.decodeAudioData(e.target.result, (decodedData) => {
+            // 디코딩 완료 시 게임 시작
+            instruction.parentElement.style.display = 'none';
+            if(touchControls) touchControls.style.display = 'flex';
+
+            source = audioContext.createBufferSource();
+            source.buffer = decodedData;
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            source.start(0);
+            source.onended = gameOver;
+        }, (err) => {
+            alert("Audio decode failed: " + err.message);
+            instruction.innerHTML = originalText; // 에러 시 복구는 복잡하므로 간단히 새로고침 권장 메시지 등
+            location.reload(); 
+        });
+    };
 }
+
+// setupAudio 함수는 startGame으로 통합되었으므로 제거하거나 남겨두되 사용하지 않음
+function setupAudio(buffer) { /* Deprecated */ }
+
+
 
 function spawnObstacle() {
     if (!obstacleModel) return;
@@ -524,7 +563,7 @@ function gameOver() {
 
     instruction.innerHTML = `<h1 style="color:red">IMPACT DETECTED</h1><p style="font-size:24px;">${score}</p><p>DROP MUSIC TO RETRY</p>`;
     
-    // 게임 오버 시에도 파일 업로드 버튼 복구 (재시작 용이성)
+    // 게임 오버 시에도 파일 업로드 버튼 복구
     instruction.innerHTML += `
         <input type="file" id="file-input-retry" accept="audio/*" style="display: none;">
         <label for="file-input-retry" id="upload-btn" style="display:inline-block; margin-top:20px;">TRY AGAIN</label>
@@ -533,13 +572,13 @@ function gameOver() {
     setTimeout(() => {
         const retryInput = document.getElementById('file-input-retry');
         if(retryInput) {
-            retryInput.addEventListener('change', (e) => {
-                 if (e.target.files[0]) startGame(e.target.files[0]);
-            });
+            retryInput.addEventListener('change', handleFileSelect);
         }
     }, 100);
 
-    if(source) source.stop();
+    if(source) {
+        try { source.stop(); } catch(e){}
+    }
 }
 
 animate();
